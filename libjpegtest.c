@@ -149,7 +149,7 @@ int main(int argc, char *argv[])
     long int screensize = 0;
     int scaled_width, scaled_height;
     // const char *filename = (argc > 1) ? argv[1] : "150_58103072.jpg";
-    const char *fileName[4] = {"143_56065927log_p7.jpg", "145_56065927log_p9.jpg", "150_58103072.jpg", "201_67767892log3_p2.jpg"};
+    const char *fileName[4] = {"./Picture/143_56065927log_p7.jpg", "./Picture/145_56065927log_p9.jpg", "./Picture/150_58103072.jpg", "./Picture/201_67767892log3_p2.jpg"};
     int fd;
     struct input_event ev;
     int x = 0, y = 0;
@@ -283,11 +283,6 @@ int main(int argc, char *argv[])
         // 8. 将图像居中显示到LCD
         center_image_on_lcd(scaled_image, scaled_width, scaled_height,
                             (unsigned char *)fbp, LCD_WIDTH, LCD_HEIGHT, finfo.line_length);
-
-        // 9. 清理资源
-        munmap(fbp, screensize);
-        close(fb_fd);
-        free(scaled_image);
         while (1)
         {
             if (read(fd, &ev, sizeof(struct input_event)) < 0)
@@ -296,20 +291,66 @@ int main(int argc, char *argv[])
                 close(fd);
                 return EXIT_FAILURE;
             }
-            if (ev.type == EV_KEY && ev.code == BTN_TOUCH)
+            if (ev.type == EV_ABS)
             {
+                switch (ev.code)
+                {
+                case ABS_X:
+                    x = ev.value;
+                    break;
+                case ABS_Y:
+                    y = ev.value;
+                    break;
+                case ABS_PRESSURE: // 有些触摸屏用这个表示触摸压力
+                    touch_pressed = (ev.value > 0);
+                    break;
+                case ABS_MT_POSITION_X: // 多点触控X坐标
+                    x = ev.value;
+                    break;
+                case ABS_MT_POSITION_Y: // 多点触控Y坐标
+                    y = ev.value;
+                    break;
+                case ABS_MT_TRACKING_ID: // 多点触控ID
+                    touch_pressed = (ev.value != -1);
+                    break;
+                }
+            }
+            else if (ev.type == EV_KEY && ev.code == BTN_TOUCH)
+            {
+                // 单点触控的按下/释放事件
                 touch_pressed = ev.value;
             }
             else if (ev.type == EV_SYN && ev.code == SYN_REPORT)
             {
                 if (!touch_pressed)
                 {
-                    kkt = (kkt + 1) % 4;
-                    printf("触摸释放");
-                    break;
+                    printf("x:%d, y:%d\n", x, y);
+                    if (x > 0 && x < 512 && y > 0 && y < 600) // 左半屏
+                    {
+                        kkt = kkt - 1;
+                        if (kkt < 0)
+                        {
+                            kkt = 3;
+                        }
+                        break;
+                    }
+                    else if (x > 900 && x < 1024 && y > 0 && y < 100) // 右上角
+                    {
+                        memset((unsigned char *)fbp, 0, finfo.line_length * LCD_HEIGHT);
+                        exit(0);
+                    }
+                    else if (x > 512 && x < 1024 && y > 0 && y < 600) // 右半屏
+                    {
+                        kkt = (kkt + 1) % 4;
+                        break;
+                    }
                 }
             }
         }
+        // 9. 清理资源
+        munmap(fbp, screensize);
+        close(fb_fd);
+        free(scaled_image);
     }
 
     printf("图像显示完成\n");
