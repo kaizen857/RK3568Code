@@ -142,13 +142,36 @@ int compare_filenames(const void *a, const void *b)
 
 void *play_audio_thread(void *arg)
 {
-    // system("amixer -D pulse sset Master 10%");
-    system("sleep 0.4 &&amixer -c 0 set Master 100%&&mpg123 -g 1 output.mp3"); // 在子线程中播放音频
+    char *dir_path = (char *)arg;
+    char audio_file[256];
+    char audio_name[256];
+
+    // 从路径中提取目录名（如"./video3" -> "video3"）
+    const char *last_slash = strrchr(dir_path, '/');
+    if (last_slash != NULL)
+    {
+        strncpy(audio_name, last_slash + 1, sizeof(audio_name) - 1);
+    }
+    else
+    {
+        strncpy(audio_name, dir_path, sizeof(audio_name) - 1);
+    }
+    audio_name[sizeof(audio_name) - 1] = '\0'; // 确保字符串终止
+
+    snprintf(audio_file, sizeof(audio_file), "%s/%s.mp3", dir_path, audio_name);
+
+    char command[512];
+    snprintf(command, sizeof(command),
+             "sleep 0.4 && amixer -c 0 set Master 30%% && mpg123 -o alsa -v \"%s\"",
+             audio_file);
+
+    system(command);
     return NULL;
 }
 
 int main(int argc, char **argv)
 {
+    system("mpg123 -o alsa -v --delay 0.1 /dev/null 2>/dev/null");
     DIR *dir;
     struct dirent *ent;
     char **filenames = NULL;
@@ -220,7 +243,7 @@ int main(int argc, char **argv)
 
     long long frame_start_time, frame_end_time, elapsed_time, delay_time;
     pthread_t audio_thread;
-    if (pthread_create(&audio_thread, NULL, play_audio_thread, NULL) != 0)
+    if (pthread_create(&audio_thread, NULL, play_audio_thread, dir_path) != 0)
     {
         perror("无法创建音频线程");
         return 1;
