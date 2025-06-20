@@ -1,0 +1,1 @@
+aarch64-none-linux-gnu-gcc ./src/main.c ./src/album.c ./src/client.c ./src/video.c -o main -ljpeg -I./include -static

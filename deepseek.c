@@ -57,7 +57,7 @@ int main()
             strcat(buffer1, buffer);
         }
 
-        // printf("search_results： %s\n", search_results);
+        printf("search_results： %s\n", buffer1);
         char *p = strstr(buffer1, "</think>");
         shift_string_left(p, 9);
         strcpy(result, p);
