@@ -27,37 +27,57 @@ void shift_string_left(char *str, size_t k)
     memmove(str, str + k, bytes_to_move);
 }
 
-void handleMessage(char *message, size_t lens)
+int handleMessage(int socket, char *message, size_t lens)
 {
     // TODO:消息处理
     memset(question, 0, sizeof(question));
     memset(buffer, 0, sizeof(buffer));
     memset(buffer1, 0, sizeof(buffer1));
     memcpy(question, message, lens);
-    printf("问题: %s\n", question);
-    sprintf(cmd, "python3 deepseek.py %s", question);
-    FILE *fp = popen(cmd, "r");
-    if (fp == NULL)
+    if (question[0] == '1') // 常规消息（文字信息）
     {
-        perror("无法加载模型\n");
-    }
-
-    // 读取chatglm 模型的输出内容
-    while (1)
-    {
-        if (fgets(buffer, sizeof(buffer), fp) == NULL)
+        strcpy(question, question + 1);
+        if (strcmp(question, "exit") == 0)
         {
-            printf("加载完毕\n");
-            break;
+            return 1;
         }
-        strcat(buffer1, buffer);
-    }
+        printf("问题: %s\n", question);
+        sprintf(cmd, "python3 deepseek.py %s", question);
+        FILE *fp = popen(cmd, "r");
+        if (fp == NULL)
+        {
+            perror("无法加载模型\n");
+        }
 
-    // printf("search_results： %s\n", search_results);
-    char *p = strstr(buffer1, "</think>");
-    shift_string_left(p, 9);
-    strcpy(result, p);
-    printf("结果: %s\n", result);
+        // 读取chatglm 模型的输出内容
+        while (1)
+        {
+            if (fgets(buffer, sizeof(buffer), fp) == NULL)
+            {
+                printf("加载完毕\n");
+                break;
+            }
+            strcat(buffer1, buffer);
+        }
+
+        // printf("search_results： %s\n", search_results);
+        char *p = strstr(buffer1, "</think>");
+        if (p != NULL)
+        {
+            shift_string_left(p, 9);
+            strcpy(result, p);
+            write(socket, result, strlen(result));
+        }
+        else
+        {
+            write(socket, "加载失败", 13);
+        }
+        return 0;
+    }
+    else if (question[0] == '2') // 语音文件
+    {
+    }
+    return 0;
 }
 
 int server(int argc, char *argv[])
@@ -153,7 +173,10 @@ int server(int argc, char *argv[])
     {
         memset(buf, 0, sizeof(buf));
         read(client_connect, buf, sizeof(buf));
-        handleMessage(buf, strlen(buf));
+        if (handleMessage(client_connect, buf, strlen(buf)))
+        {
+            break;
+        }
     }
 
     return 0;

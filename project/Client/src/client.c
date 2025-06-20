@@ -21,7 +21,7 @@ int sendMessage(int socket_fd, char *buf, int bufSize)
         ;
     return ret;
 }
-
+char buf[8192] = {0};
 void terminalSovle(void *arg)
 {
     // TODO:终端输入
@@ -29,18 +29,31 @@ void terminalSovle(void *arg)
     while (1)
     {
         printf("请输入指令：\n");
-        char buf[1024] = {0};
+
         fgets(buf, sizeof(buf), stdin);
         buf[strlen(buf) - 1] = '\0';
-        printf("buf = %s\n", buf);
-        if (strcmp(buf, "exit") == 0)
+        // printf("buf = %s\n", buf);
+        memmove(buf + 1, buf, strlen(buf));
+        buf[0] = '1';
+        if (strcmp(buf, "1exit") == 0)
         {
+            sendMessage(socket_fd, buf, strlen(buf));
             printf("退出程序\n");
+            return;
         }
         else
         {
             // 向主机发送字符串
             sendMessage(socket_fd, buf, strlen(buf));
+            // 接收主机返回的字符串
+            memset(buf, 0, sizeof(buf));
+            int ret = read(socket_fd, buf, sizeof(buf));
+            if (ret == -1)
+            {
+                perror("read error");
+                return;
+            }
+            printf("主机返回：%s\n", buf);
         }
     }
 }
@@ -82,6 +95,17 @@ int client(int argc, char *argv[])
         return -1;
     }
     terminalSovle((void *)&socket_fd);
-
+    if (socket_fd != -1)
+    {
+        if (close(socket_fd) == -1)
+        {
+            perror("close error");
+            return -1;
+        }
+    }
+    else
+    {
+        perror("socket error");
+    }
     return 0;
 }

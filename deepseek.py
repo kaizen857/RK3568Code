@@ -9,11 +9,11 @@ def deepseek_query(prompt, model="deepseek-r1:1.5b"):
     payload = {
         "model": model,
         "messages": [
-            {"role": "system", "content": "你是一位专业的AI助手"},
+            #{"role": "system", "content": "你是一位专业的AI助手"},
             {"role": "user", "content": prompt}
         ],
         "temperature": 0.7,
-        "max_tokens": 2048,  # 增大最大生成长度
+        "max_tokens": 4096,  # 增大最大生成长度
         "stream": False       # 显式关闭流式传输
     }
  
