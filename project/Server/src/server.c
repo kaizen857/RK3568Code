@@ -6,6 +6,10 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#define BUFFER_SIZE 4096
+
+#define OUTPUT_FILENAME "received.wav"
+
 char question[4096];
 char buffer[4096];
 char buffer1[8192];
@@ -29,6 +33,7 @@ void shift_string_left(char *str, size_t k)
 
 int handleMessage(int socket, char *message, size_t lens)
 {
+    printf("lens:%lu", lens);
     // TODO:消息处理
     memset(question, 0, sizeof(question));
     memset(buffer, 0, sizeof(buffer));
@@ -76,6 +81,72 @@ int handleMessage(int socket, char *message, size_t lens)
     }
     else if (question[0] == '2') // 语音文件
     {
+        uint32_t fileSize;
+        memcpy(&fileSize, question + 1, sizeof(fileSize));
+        printf("文件大小: %u\n", fileSize);
+
+        fileSize = ntohl(fileSize);
+        printf("文件大小: %u\n", fileSize);
+        FILE *output_file = fopen(OUTPUT_FILENAME, "wb");
+        if (!output_file)
+        {
+            perror("Failed to create output file");
+            // TODO:错误处理
+        }
+        // 7. 接收文件数据并写入
+        uint8_t buffer[BUFFER_SIZE];
+        size_t total_received = 0;
+        ssize_t bytes_received;
+
+        while (total_received < fileSize)
+        {
+            size_t remaining = fileSize - total_received;
+            size_t to_receive = remaining > BUFFER_SIZE ? BUFFER_SIZE : remaining;
+
+            bytes_received = read(socket, buffer, to_receive);
+            if (bytes_received <= 0)
+            {
+                if (bytes_received < 0)
+                {
+                    perror("Error receiving data");
+                }
+                else
+                {
+                    fprintf(stderr, "Connection closed prematurely\n");
+                }
+                fclose(output_file);
+                // close(socket);
+                // close(server_fd);
+                // exit(EXIT_FAILURE);
+            }
+            printf("bytes_received: %zd\n", bytes_received);
+
+            // 写入文件
+            size_t bytes_written = fwrite(buffer, 1, bytes_received, output_file);
+            if (bytes_written != bytes_received)
+            {
+                perror("Failed to write to file");
+                fclose(output_file);
+                // close(socket);
+                // close(server_fd);
+                // exit(EXIT_FAILURE);
+            }
+
+            total_received += bytes_received;
+            printf("\rReceived: %zu/%u bytes (%.2f%%)",
+                   total_received, fileSize,
+                   (float)total_received / fileSize * 100);
+            fflush(stdout);
+        }
+
+        printf("\nFile received successfully and saved as '%s'\n", OUTPUT_FILENAME);
+        fclose(output_file);
+        // 再丢包就开摆.jpg
+        char ack = 'A';
+        if (write(socket, &ack, 1) != 1)
+        {
+            perror("Failed to send ACK");
+        }
     }
     return 0;
 }
@@ -98,6 +169,13 @@ int server(int argc, char *argv[])
     if (socket_fd == -1)
     {
         perror("socket error");
+        return -1;
+    }
+    int opt = 1;
+    if (setsockopt(socket_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)))
+    {
+        perror("Setsockopt failed");
+        close(socket_fd);
         return -1;
     }
     // ----------------配置TCP-------------------------------
@@ -172,8 +250,12 @@ int server(int argc, char *argv[])
     while (1)
     {
         memset(buf, 0, sizeof(buf));
-        read(client_connect, buf, sizeof(buf));
-        if (handleMessage(client_connect, buf, strlen(buf)))
+        int lens = read(client_connect, buf, sizeof(buf));
+        if (buf[0] == '2')
+        {
+        }
+
+        if (handleMessage(client_connect, buf, lens))
         {
             break;
         }
