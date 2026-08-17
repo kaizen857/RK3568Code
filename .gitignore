@@ -1,0 +1,24 @@
+# 编译产物
+*.o
+*.out
+*.a
+*.so
+a.out
+build/
+output/
+
+# IDE 与工具
+.idea/
+*.iml
+.vscode/
+.settings/
+.classpath
+.project
+.omo/
+.opencode/
+
+# 系统与媒体
+.DS_Store
+*.log
+*.bmp
+*.wav
